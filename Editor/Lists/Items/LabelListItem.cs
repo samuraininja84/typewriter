@@ -13,8 +13,6 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
         protected readonly TextField Text;
         protected readonly Label Type;
 
-        private bool isEditing => Text.value == Label.text;
-
         private bool Hovered => Root.worldBound.Contains(Event.current.mousePosition);
 
         public LabelListItem()
@@ -31,7 +29,7 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
             Type.AddToClassList("editable-item__type");
 
             Label.RegisterCallback<MouseDownEvent>(HandleMouseDown);
-            RegisterCallback<FocusOutEvent>(HandleFocusOut);
+            Text.RegisterCallback<FocusOutEvent>(HandleFocusOut);
 
             Add(Root);
             Root.Add(Label);
@@ -44,10 +42,15 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
         protected virtual void HandleFocusOut(FocusOutEvent evt)
         {
             // Check if we selected something else outside of this item
-            if (Hovered && isEditing) return;
+            if (Hovered) return;
 
+            // Show the label
             Label.style.display = DisplayStyle.Flex;
+
+            // Update the label
             SetLabel(Text.value);
+
+            // Hide the text field
             Text.style.display = DisplayStyle.None;
         }
 
@@ -56,10 +59,14 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
             // Double click - enter edit mode
             if (evt.clickCount == 2)
             {
-                // Focus the text field
+                // Hide the label field
                 Label.style.display = DisplayStyle.None;
+
+                // Show the text field
                 Text.style.display = DisplayStyle.Flex;
-                Text.Focus();
+
+                // Focus the text field
+                Text.ElementAt(0).Focus();
 
                 // Select the text
                 Text.SelectAll();
