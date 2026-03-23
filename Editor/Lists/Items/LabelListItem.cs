@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -90,4 +90,3 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
         }
     }
 }
-
