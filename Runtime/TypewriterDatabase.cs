@@ -1,369 +1,342 @@
-﻿using Aarthificial.Typewriter.Entries;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
+using UnityEditor;
 using UnityEngine.Assertions;
+using Aarthificial.Typewriter.Entries;
 
-namespace Aarthificial.Typewriter {
-  public class TypewriterDatabase : ScriptableObject,
-    ISerializationCallbackReceiver {
-    public delegate void EntryAction(
-      BaseEntry entry,
-      ITypewriterContext context
-    );
+namespace Aarthificial.Typewriter
+{
+    public class TypewriterDatabase : ScriptableObject, ISerializationCallbackReceiver
+    {
+        public delegate void EntryAction(BaseEntry entry, ITypewriterContext context);
 
-    internal static bool HasCachedInstance;
-    private static TypewriterDatabase _instance;
+        internal static bool HasCachedInstance;
+        private static TypewriterDatabase _instance;
 
-    public List<DatabaseTable> Tables = new();
-    private readonly Dictionary<int, BaseEntry> _entryLookup = new();
+        public List<DatabaseTable> Tables = new();
+        private readonly Dictionary<int, BaseEntry> _entryLookup = new();
 
-    private readonly Dictionary<int, EntryAction> _events = new();
-    private readonly Dictionary<int, List<BaseEntry>> _relationsLookup = new();
-    private readonly Dictionary<int, DatabaseTable> _tableLookup = new();
-    private int _changeCounter = 1;
-    private bool _lookupCreated;
+        private readonly Dictionary<int, EntryAction> _events = new();
+        private readonly Dictionary<int, List<BaseEntry>> _relationsLookup = new();
+        private readonly Dictionary<int, DatabaseTable> _tableLookup = new();
+        private int _changeCounter = 1;
+        private bool _lookupCreated;
 
-    public static TypewriterDatabase Instance {
-      get {
-#if UNITY_EDITOR
-        if (!HasCachedInstance) {
-          HasCachedInstance = true;
-          var guids =
-            AssetDatabase.FindAssets("t:" + nameof(TypewriterDatabase));
-          if (guids.Length > 0) {
-            _instance =
-              (TypewriterDatabase)AssetDatabase.LoadMainAssetAtPath(
-                AssetDatabase.GUIDToAssetPath(guids[0])
-              );
-          }
-        }
-#endif
-        return _instance;
-      }
-    }
+        private event EntryAction GlobalEvent;
 
-    private void OnEnable() {
-      _changeCounter = 1;
-      if (!HasCachedInstance) {
-        HasCachedInstance = true;
-        _instance = this;
-      }
-    }
-
-    public void OnBeforeSerialize() { }
-
-    public void OnAfterDeserialize() {
-      _lookupCreated = false;
-    }
-
-    private event EntryAction GlobalEvent;
-
-    [RuntimeInitializeOnLoadMethod(
-      RuntimeInitializeLoadType.SubsystemRegistration
-    )]
-    private static void Init() {
-      Instance._lookupCreated = false;
-    }
-
-    private int GetNextKey() {
-      var key = UidGenerator.GetNextKey();
-      while (Contains(key)) {
-        key = UidGenerator.GetNextKey();
-      }
-
-      return key;
-    }
-
-    public void CreateLookupIfNecessary() {
-      if (!_lookupCreated) {
-        CreateLookup();
-      }
-    }
-
-    public void UpdateLookupIfExists() {
-      if (_lookupCreated) {
-        CreateLookup();
-      }
-    }
-
-    public void MarkChange() {
-      _changeCounter++;
-    }
-
-    public bool HasChangedSince(ref int change) {
-      if (change < _changeCounter) {
-        change = _changeCounter;
-        return true;
-      }
-
-      return false;
-    }
-
-    public void CreateLookup() {
-#if UNITY_EDITOR
-      Debug.Log("Typewriter: Recreating database lookup", this);
-#endif
-
-      _lookupCreated = true;
-      _entryLookup.Clear();
-      _tableLookup.Clear();
-
-      foreach (var table in Tables) {
-#if UNITY_EDITOR
-        if (table == null) {
-          Debug.LogWarning("Typewriter: Skipping null table", this);
-          continue;
-        }
-#endif
-
-        foreach (var entry in table.Rules) {
-          OnCreateEntry(entry, table);
+        public static TypewriterDatabase Instance
+        {
+            get
+            {
+            #if UNITY_EDITOR
+                if (!HasCachedInstance)
+                {
+                    HasCachedInstance = true;
+                    var guids = AssetDatabase.FindAssets("t:" + nameof(TypewriterDatabase));
+                    if (guids.Length > 0) _instance = (TypewriterDatabase)AssetDatabase.LoadMainAssetAtPath(AssetDatabase.GUIDToAssetPath(guids[0]));
+                }
+            #endif
+                return _instance;
+            }
         }
 
-        foreach (var entry in table.Facts) {
-          OnCreateEntry(entry, table);
+        private void OnEnable()
+        {
+            _changeCounter = 1;
+            if (!HasCachedInstance)
+            {
+                HasCachedInstance = true;
+                _instance = this;
+            }
         }
 
-        foreach (var entry in table.Events) {
-          OnCreateEntry(entry, table);
-        }
-      }
+        public void OnBeforeSerialize() { }
 
-      RecreateRelations();
-    }
+        public void OnAfterDeserialize() => _lookupCreated = false;
 
-    internal void RecreateRelations() {
-      if (!_lookupCreated) {
-        return;
-      }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Init() => Instance._lookupCreated = false;
 
-      foreach (var list in _relationsLookup.Values) {
-        list.Clear();
-      }
-
-      foreach (var entry in _entryLookup.Values) {
-        CreateRelations(entry);
-      }
-    }
-
-    private void CreateRelations(BaseEntry entry) {
-      foreach (var trigger in entry.Triggers.List) {
-        var searchList = GetRelations(trigger.ID);
-        var index = searchList.BinarySearch(entry);
-        if (index < 0) {
-          index = ~index;
+        private int GetNextKey()
+        {
+            var key = UidGenerator.GetNextKey();
+            while (Contains(key)) key = UidGenerator.GetNextKey();
+            return key;
         }
 
-        searchList.Insert(index, entry);
-      }
-    }
-
-    #region rules
-
-    public List<BaseEntry> GetRelations(int id) {
-      CreateLookupIfNecessary();
-      if (!_relationsLookup.TryGetValue(id, out var list)) {
-        list = new List<BaseEntry>();
-        _relationsLookup[id] = list;
-      }
-
-      return list;
-    }
-
-    #endregion
-
-    #region entries
-
-    public BaseEntry CreateEntry(DatabaseTable table, Type entryType) {
-      var entry = (BaseEntry)Activator.CreateInstance(entryType);
-      entry.ID = GetNextKey();
-      AddEntry(table, entry);
-
-      return entry;
-    }
-
-    public void AddEntry(DatabaseTable table, BaseEntry entry) {
-      if (!Tables.Contains(table)) {
-        throw new InvalidOperationException();
-      }
-
-      table.AddEntry(entry);
-      OnCreateEntry(entry, table);
-      CreateRelations(entry);
-    }
-
-    public bool RemoveEntry(BaseEntry entry) {
-      if (TryGetTable(entry.ID, out var table)) {
-        table.RemoveEntry(entry);
-        OnRemoveEntry(entry);
-        return true;
-      }
-
-      return false;
-    }
-
-    public bool RemoveEntry(int id) {
-      return TryGetEntry(id, out var entry) && RemoveEntry(entry);
-    }
-
-    public bool TryGetEntry(int id, out BaseEntry entry) {
-      CreateLookupIfNecessary();
-      return _entryLookup.TryGetValue(id, out entry);
-    }
-
-    public bool TryGetEntry<T>(int id, out T entry) where T : BaseEntry {
-      if (TryGetEntry(id, out var raw) && raw is T typed) {
-        entry = typed;
-        return true;
-      }
-
-      entry = default;
-      return false;
-    }
-
-    public bool Contains(int id) {
-      CreateLookupIfNecessary();
-      return _entryLookup.ContainsKey(id);
-    }
-
-    private void OnCreateEntry(BaseEntry entry, DatabaseTable table) {
-      if (entry == null) {
-        Debug.LogWarningFormat(
-          "Typewriter: Invalid entry in table {0}",
-          table.name
-        );
-        return;
-      }
-
-      if (entry.ID == 0) {
-        Debug.LogWarningFormat(
-          "Typewriter: Dialogue {0} skipped (id == 0)",
-          entry
-        );
-        return;
-      }
-
-      if (!_lookupCreated) {
-        return;
-      }
-
-      _entryLookup[entry.ID] = entry;
-      _tableLookup[entry.ID] = table;
-      entry.Entries = GetRelations(entry.ID);
-    }
-
-    private void OnRemoveEntry(BaseEntry entry) {
-      if (!_lookupCreated) {
-        return;
-      }
-
-      _entryLookup.Remove(entry.ID);
-      _tableLookup.Remove(entry.ID);
-
-      for (var i = entry.Triggers.List.Length - 1; i >= 0; i--) {
-        var trigger = entry.Triggers.List[i];
-        GetRelations(trigger.ID).Remove(entry);
-      }
-    }
-
-    #endregion
-
-    #region tables
-
-    public int AddTable(DatabaseTable table, int index = -1) {
-      if (index > -1) {
-        Tables.Insert(index, table);
-        return index;
-      }
-
-      Tables.Add(table);
-      return Tables.Count - 1;
-    }
-
-    public void RemoveTable(DatabaseTable table) {
-      if (!Tables.Contains(table)) {
-        return;
-      }
-
-      for (var i = table.Rules.Count - 1; i >= 0; i--) {
-        var entry = table.Rules[i];
-        RemoveEntry(entry);
-      }
-
-      Tables.Remove(table);
-    }
-
-    public bool TryGetTable(int id, out DatabaseTable table) {
-      CreateLookupIfNecessary();
-      return _tableLookup.TryGetValue(id, out table);
-    }
-
-    public bool TryGetTable<T>(int id, out T table) where T : DatabaseTable {
-      if (TryGetTable(id, out var raw) && raw is T typed) {
-        table = typed;
-        return true;
-      }
-
-      table = default;
-      return false;
-    }
-
-    public void MoveToTable(int id, DatabaseTable table) {
-      if (TryGetTable(id, out var oldCategory)
-        && oldCategory != table
-        && TryGetEntry(id, out var entry)) {
-        table.RemoveEntry(entry);
-        table.AddEntry(entry);
-
-        if (_lookupCreated) {
-          _tableLookup[id] = table;
+        public void CreateLookupIfNecessary()
+        {
+            if (!_lookupCreated)
+            {
+                CreateLookup();
+            }
         }
-      }
-    }
+
+        public void UpdateLookupIfExists()
+        {
+            if (_lookupCreated)
+            {
+                CreateLookup();
+            }
+        }
+
+        public void MarkChange() => _changeCounter++;
+
+        public bool HasChangedSince(ref int change)
+        {
+            if (change < _changeCounter)
+            {
+                change = _changeCounter;
+                return true;
+            }
+
+            return false;
+        }
+
+        public void CreateLookup()
+        {
+      #if UNITY_EDITOR
+            Debug.Log("Typewriter: Recreating database lookup", this);
+      #endif
+
+            _lookupCreated = true;
+            _entryLookup.Clear();
+            _tableLookup.Clear();
+
+            foreach (var table in Tables)
+            {
+        #if UNITY_EDITOR
+                if (table == null)
+                {
+                    Debug.LogWarning("Typewriter: Skipping null table", this);
+                    continue;
+                }
+        #endif
+                foreach (var entry in table.Rules) OnCreateEntry(entry, table);
+                foreach (var entry in table.Facts) OnCreateEntry(entry, table);
+                foreach (var entry in table.Events) OnCreateEntry(entry, table);
+            }
+
+            RecreateRelations();
+        }
+
+        internal void RecreateRelations()
+        {
+            if (!_lookupCreated) return;
+            foreach (var list in _relationsLookup.Values) list.Clear();
+            foreach (var entry in _entryLookup.Values) CreateRelations(entry);
+        }
+
+        private void CreateRelations(BaseEntry entry)
+        {
+            foreach (var trigger in entry.Triggers.List)
+            {
+                var searchList = GetRelations(trigger.ID);
+                var index = searchList.BinarySearch(entry);
+                if (index < 0) index = ~index;
+                searchList.Insert(index, entry);
+            }
+        }
+
+        #region rules
+
+        public List<BaseEntry> GetRelations(int id)
+        {
+            CreateLookupIfNecessary();
+            if (!_relationsLookup.TryGetValue(id, out var list))
+            {
+                list = new List<BaseEntry>();
+                _relationsLookup[id] = list;
+            }
+            return list;
+        }
+
+        #endregion
+
+        #region entries
+
+        public BaseEntry CreateEntry(DatabaseTable table, Type entryType)
+        {
+            var entry = (BaseEntry)Activator.CreateInstance(entryType);
+            entry.ID = GetNextKey();
+            AddEntry(table, entry);
+            return entry;
+        }
+
+        public void AddEntry(DatabaseTable table, BaseEntry entry)
+        {
+            if (!Tables.Contains(table)) throw new InvalidOperationException();
+            table.AddEntry(entry);
+            OnCreateEntry(entry, table);
+            CreateRelations(entry);
+        }
+
+        public bool RemoveEntry(BaseEntry entry)
+        {
+            if (TryGetTable(entry.ID, out var table))
+            {
+                table.RemoveEntry(entry);
+                OnRemoveEntry(entry);
+                return true;
+            }
+            return false;
+        }
+
+        public bool RemoveEntry(int id) => TryGetEntry(id, out var entry) && RemoveEntry(entry);
+
+        public bool TryGetEntry(int id, out BaseEntry entry)
+        {
+            CreateLookupIfNecessary();
+            return _entryLookup.TryGetValue(id, out entry);
+        }
+
+        public bool TryGetEntry<T>(int id, out T entry) where T : BaseEntry
+        {
+            if (TryGetEntry(id, out var raw) && raw is T typed)
+            {
+                entry = typed;
+                return true;
+            }
+            entry = default;
+            return false;
+        }
+
+        public bool Contains(int id)
+        {
+            CreateLookupIfNecessary();
+            return _entryLookup.ContainsKey(id);
+        }
+
+        private void OnCreateEntry(BaseEntry entry, DatabaseTable table)
+        {
+            if (entry == null)
+            {
+                Debug.LogWarningFormat("Typewriter: Invalid entry in table {0}", table.name);
+                return;
+            }
+
+            if (entry.ID == 0)
+            {
+                Debug.LogWarningFormat("Typewriter: Dialogue {0} skipped (id == 0)", entry);
+                return;
+            }
+
+            if (!_lookupCreated) return;
+
+            _entryLookup[entry.ID] = entry;
+            _tableLookup[entry.ID] = table;
+            entry.Entries = GetRelations(entry.ID);
+        }
+
+        private void OnRemoveEntry(BaseEntry entry)
+        {
+            if (!_lookupCreated) return;
+
+            _entryLookup.Remove(entry.ID);
+            _tableLookup.Remove(entry.ID);
+
+            for (var i = entry.Triggers.List.Length - 1; i >= 0; i--)
+            {
+                var trigger = entry.Triggers.List[i];
+                GetRelations(trigger.ID).Remove(entry);
+            }
+        }
+
+        #endregion
+
+        #region tables
+
+        public int AddTable(DatabaseTable table, int index = -1)
+        {
+            if (index > -1)
+            {
+                Tables.Insert(index, table);
+                return index;
+            }
+            Tables.Add(table);
+            return Tables.Count - 1;
+        }
+
+        public void RemoveTable(DatabaseTable table)
+        {
+            if (!Tables.Contains(table)) return;
+            for (var i = table.Rules.Count - 1; i >= 0; i--)
+            {
+                var entry = table.Rules[i];
+                RemoveEntry(entry);
+            }
+            Tables.Remove(table);
+        }
+
+        public bool TryGetTable(int id, out DatabaseTable table)
+        {
+            CreateLookupIfNecessary();
+            return _tableLookup.TryGetValue(id, out table);
+        }
+
+        public bool TryGetTable<T>(int id, out T table) where T : DatabaseTable
+        {
+            if (TryGetTable(id, out var raw) && raw is T typed)
+            {
+                table = typed;
+                return true;
+            }
+            table = default;
+            return false;
+        }
+
+        public void MoveToTable(int id, DatabaseTable table)
+        {
+            if (TryGetTable(id, out var oldCategory) && oldCategory != table && TryGetEntry(id, out var entry))
+            {
+                table.RemoveEntry(entry);
+                table.AddEntry(entry);
+                if (_lookupCreated) _tableLookup[id] = table;
+            }
+        }
 
     #endregion
 
     #region events
 
-    public void AddListener(EntryAction action) {
-      GlobalEvent += action;
+        public void AddListener(EntryAction action) => GlobalEvent += action;
+
+        public void RemoveListener(EntryAction action) => GlobalEvent -= action;
+
+        public void AddListener(int id, EntryAction action)
+        {
+            if (_events.ContainsKey(id))
+            {
+                _events[id] += action;
+            }
+            else
+            {
+                _events[id] = action;
+            }
+        }
+
+        public void RemoveListener(int id, EntryAction action)
+        {
+            if (!_events.ContainsKey(id)) return;
+            var listeners = _events[id] - action;
+            if (listeners == null)
+            {
+                _events.Remove(id);
+            }
+            else
+            {
+                _events[id] = listeners;
+            }
+        }
+
+        public void OnEntryEvent(ITypewriterContext provider, BaseEntry entry)
+        {
+            Assert.IsNotNull(entry);
+            GlobalEvent?.Invoke(entry, provider);
+            if (_events.TryGetValue(entry.ID, out var callbacks)) callbacks.Invoke(entry, provider);
+        }
+
+        #endregion
     }
-
-    public void RemoveListener(EntryAction action) {
-      GlobalEvent -= action;
-    }
-
-    public void AddListener(int id, EntryAction action) {
-      if (_events.ContainsKey(id)) {
-        _events[id] += action;
-      } else {
-        _events[id] = action;
-      }
-    }
-
-    public void RemoveListener(int id, EntryAction action) {
-      if (!_events.ContainsKey(id)) {
-        return;
-      }
-
-      var listeners = _events[id] - action;
-      if (listeners == null) {
-        _events.Remove(id);
-      } else {
-        _events[id] = listeners;
-      }
-    }
-
-    public void OnEntryEvent(ITypewriterContext provider, BaseEntry entry) {
-      Assert.IsNotNull(entry);
-      GlobalEvent?.Invoke(entry, provider);
-      if (_events.TryGetValue(entry.ID, out var callbacks)) {
-        callbacks.Invoke(entry, provider);
-      }
-    }
-
-    #endregion
-  }
 }
