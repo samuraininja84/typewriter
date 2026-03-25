@@ -1,3 +1,4 @@
-﻿namespace Aarthificial.Typewriter.Entries {
-  public class ScopeEntry : FactEntry { }
+﻿namespace Aarthificial.Typewriter.Entries
+{
+    public class ScopeEntry : FactEntry { }
 }

@@ -1,23 +1,16 @@
 ﻿using System.Collections;
-using NUnit.Framework;
-using UnityEditor;
-using UnityEngine;
 using UnityEngine.TestTools;
-using UnityEngine.UI;
+using NUnit.Framework;
 
 namespace Tests.Runtime
 {
     public class TypewriterTests
     {
         [SetUp]
-        public void Setup()
-        {
-        }
+        public void Setup() { }
 
         [TearDown]
-        public void Teardown()
-        {
-        }
+        public void Teardown() { }
 
         [UnityTest]
         public IEnumerator TestMethod_TestingHow_TestResult()

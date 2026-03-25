@@ -1,9 +1,9 @@
-﻿using Aarthificial.Typewriter.Attributes;
-using Aarthificial.Typewriter.Blackboards;
-using Aarthificial.Typewriter.References;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Aarthificial.Typewriter.Attributes;
+using Aarthificial.Typewriter.Blackboards;
+using Aarthificial.Typewriter.References;
 
 namespace Aarthificial.Typewriter.Entries {
   [Serializable]
