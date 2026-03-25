@@ -26,8 +26,8 @@
   "changelogUrl": "https://github.com/aarthificial-gamedev/typewriter/blob/main/CHANGELOG.md",
   "author": {
     "name": "aarthificial",
-    "email": "contact@aarthificial.com",
-    "url": "https://aarthificial.com"
+    "url": "https://aarthificial.com",
+    "email": "contact@aarthificial.com"
   },
   "samples": [
     {
@@ -35,5 +35,7 @@
       "description": "Shows how to implement a simple visual-novel-esque dialogue system.",
       "path": "Samples~/VisualNovel"
     }
-  ]
+  ],
+  "_fingerprint": "97ca659645789bd6c524d5900f2d8077c766709d",
+  "hideInEditor": false
 }
