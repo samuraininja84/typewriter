@@ -298,7 +298,7 @@ namespace Aarthificial.Typewriter
 
     #endregion
 
-    #region events
+        #region events
 
         public void AddListener(EntryAction action) => GlobalEvent += action;
 
