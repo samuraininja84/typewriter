@@ -12,15 +12,6 @@ namespace Aarthificial.Typewriter.Editor.Build
 
         public int callbackOrder => 0;
 
-        public void OnPostprocessBuild(BuildReport report)
-        {
-            if (_database == null || !_removeFromPreloadedAssets) return;
-            var preloadedAssets = PlayerSettings.GetPreloadedAssets();
-            ArrayUtility.Remove(ref preloadedAssets, _database);
-            PlayerSettings.SetPreloadedAssets(preloadedAssets);
-            _database = null;
-        }
-
         public void OnPreprocessBuild(BuildReport report)
         {
             _database = TypewriterDatabase.Instance;
@@ -32,6 +23,15 @@ namespace Aarthificial.Typewriter.Editor.Build
                 PlayerSettings.SetPreloadedAssets(preloadedAssets);
                 _removeFromPreloadedAssets = true;
             }
+        }
+
+        public void OnPostprocessBuild(BuildReport report)
+        {
+            if (_database == null || !_removeFromPreloadedAssets) return;
+            var preloadedAssets = PlayerSettings.GetPreloadedAssets();
+            ArrayUtility.Remove(ref preloadedAssets, _database);
+            PlayerSettings.SetPreloadedAssets(preloadedAssets);
+            _database = null;
         }
     }
 }
