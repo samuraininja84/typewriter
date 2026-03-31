@@ -29,7 +29,7 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
             Type.AddToClassList("editable-item__type");
 
             Label.RegisterCallback<MouseDownEvent>(HandleMouseDown);
-            Text.RegisterCallback<FocusOutEvent>(HandleFocusOut);
+            Text.RegisterCallback<NavigationSubmitEvent>(HandleSubmit);
 
             Add(Root);
             Root.Add(Label);
@@ -38,21 +38,6 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
         }
 
         protected void SetLabel(string text) => Label.text = string.IsNullOrEmpty(text) ? "<empty>" : text;
-
-        protected virtual void HandleFocusOut(FocusOutEvent evt)
-        {
-            // Check if we selected something else outside of this item
-            if (Hovered) return;
-
-            // Show the label
-            Label.style.display = DisplayStyle.Flex;
-
-            // Update the label
-            SetLabel(Text.value);
-
-            // Hide the text field
-            Text.style.display = DisplayStyle.None;
-        }
 
         private void HandleMouseDown(MouseDownEvent evt)
         {
@@ -71,6 +56,33 @@ namespace Aarthificial.Typewriter.Editor.Lists.Items
                 // Select the text
                 Text.SelectAll();
             }
+        }
+
+        protected virtual void HandleSubmit(NavigationSubmitEvent evt)
+        {
+            // Show the label
+            Label.style.display = DisplayStyle.Flex;
+
+            // Update the label
+            SetLabel(Text.value);
+
+            // Hide the text field
+            Text.style.display = DisplayStyle.None;
+        }
+
+        protected virtual void HandleFocusOut(FocusOutEvent evt)
+        {
+            // Check if we selected something else outside of this item
+            if (Hovered) return;
+
+            // Show the label
+            Label.style.display = DisplayStyle.Flex;
+
+            // Update the label
+            SetLabel(Text.value);
+
+            // Hide the text field
+            Text.style.display = DisplayStyle.None;
         }
 
         public override void BindProperty(SerializedProperty property)
